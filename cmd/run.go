@@ -4,6 +4,9 @@ import (
 	"database/sql"
 	"log/slog"
 	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
 
 	"github.com/go-co-op/gocron/v2"
 	"github.com/prometheus/client_golang/prometheus"
@@ -39,11 +42,13 @@ var runCmd = &cobra.Command{
 			if err != nil {
 				panic(err)
 			}
+			//nolint:errcheck
 			defer db.Close()
 			rows, err := db.Query("select tokentype, tokeninfo.key, count(*) from token left join tokeninfo on token.id = tokeninfo.token_id and tokeninfo.key='passkey' group by tokentype, tokeninfo.key")
 			if err != nil {
 				panic(err)
 			}
+			//nolint:errcheck
 			defer rows.Close()
 			for rows.Next() {
 				var tokentype, key string
@@ -60,6 +65,7 @@ var runCmd = &cobra.Command{
 			if err != nil {
 				panic(err)
 			}
+			//nolint:errcheck
 			defer rows.Close()
 			for rows.Next() {
 				var count int
@@ -74,7 +80,14 @@ var runCmd = &cobra.Command{
 		}
 		slog.Info("job created", slog.String("job", job.ID().String()))
 		http.Handle("/metrics", promhttp.Handler())
-		http.ListenAndServe(":2112", nil)
+		//nolint:errcheck
+		http.ListenAndServe(":8080", nil)
+		signalChan := make(chan os.Signal, 1)
+		signal.Notify(signalChan, syscall.SIGINT, syscall.SIGTERM)
+		select {
+		case <-signalChan:
+			slog.Info("shutdown received")
+		}
 	},
 }
 
