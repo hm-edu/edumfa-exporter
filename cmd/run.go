@@ -28,7 +28,7 @@ func updateData() {
 	}
 	//nolint:errcheck
 	defer db.Close()
-	rows, err := db.Query("select tokentype, tokeninfo.key, count(*) from token left join tokeninfo on token.id = tokeninfo.token_id and tokeninfo.key='passkey' group by tokentype, tokeninfo.key")
+	rows, err := db.Query("select tokentype, IFNULL(tokeninfo.key, ''), count(*) from token left join tokeninfo on token.id = tokeninfo.token_id and tokeninfo.key='passkey' group by tokentype, tokeninfo.key")
 	if err != nil {
 		slog.Error("failed executing query", slog.Any("error", err))
 		return
