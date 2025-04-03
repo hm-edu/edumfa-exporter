@@ -68,8 +68,8 @@ func updateData() {
 var runCmd = &cobra.Command{
 	Use: "run",
 	Run: func(cmd *cobra.Command, args []string) {
-		usage = prometheus.NewGaugeVec(prometheus.GaugeOpts{Name: "token"}, []string{"model"})
-		users = prometheus.NewGauge(prometheus.GaugeOpts{Name: "user"})
+		usage = prometheus.NewGaugeVec(prometheus.GaugeOpts{Namespace: "edumfa", Subsystem: "token", Name: "count"}, []string{"model"})
+		users = prometheus.NewGauge(prometheus.GaugeOpts{Namespace: "edumfa", Subsystem: "user", Name: "count"})
 		prometheus.MustRegister(usage)
 		prometheus.MustRegister(users)
 		s, err := gocron.NewScheduler()
