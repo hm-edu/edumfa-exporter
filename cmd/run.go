@@ -84,10 +84,8 @@ var runCmd = &cobra.Command{
 		http.ListenAndServe(":8080", nil)
 		signalChan := make(chan os.Signal, 1)
 		signal.Notify(signalChan, syscall.SIGINT, syscall.SIGTERM)
-		select {
-		case <-signalChan:
-			slog.Info("shutdown received")
-		}
+		<-signalChan
+		slog.Info("shutdown received")
 	},
 }
 
