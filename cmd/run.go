@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"database/sql"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
@@ -18,7 +19,7 @@ import (
 
 var db string
 var usage *prometheus.GaugeVec
-var users prometheus.Gauge
+var users *prometheus.GaugeVec
 
 func updateData() {
 	db, err := sql.Open("mysql", db)
@@ -28,7 +29,7 @@ func updateData() {
 	}
 	//nolint:errcheck
 	defer db.Close()
-	rows, err := db.Query("select tokentype, IFNULL(tokeninfo.key, ''), count(*) from token left join tokeninfo on token.id = tokeninfo.token_id and tokeninfo.key='passkey' group by tokentype, tokeninfo.key")
+	rows, err := db.Query("select tokentype, IFNULL(rollout_state, ''), IFNULL(tokeninfo.key, ''), count(*) from token left join tokeninfo on token.id = tokeninfo.token_id and tokeninfo.key='passkey' group by tokentype, tokeninfo.key, rollout_state")
 	if err != nil {
 		slog.Error("failed executing query", slog.Any("error", err))
 		return
@@ -36,18 +37,29 @@ func updateData() {
 	//nolint:errcheck
 	defer rows.Close()
 	for rows.Next() {
-		var tokentype, key string
+		var tokentype, state, key string
 		var count int
-		if err := rows.Scan(&tokentype, &key, &count); err != nil {
+		if err := rows.Scan(&tokentype, &state, &key, &count); err != nil {
 			slog.Error("failed parsing line", slog.Any("error", err))
 			return
 		}
 		if key == "passkey" {
 			tokentype = key
 		}
+		if state == "verify" || state == "clientwait" {
+			tokentype = fmt.Sprintf("%s pending", tokentype)
+		}
 		usage.WithLabelValues(tokentype).Set(float64(count))
 	}
-	rows, err = db.Query("select count(distinct user_id) from tokenowner")
+	rows, err = db.Query(
+		`	select count(distinct user_id)
+			from tokenowner 
+			join token on token.id = tokenowner.token_id 
+			where token.rollout_state NOT IN ('verify', 'clientwait') and user_id in (
+			select user_id from tokenowner 
+			join token on token.id = tokenowner.token_id 
+			where token.rollout_state IN ('verify', 'clientwait'));`,
+	)
 	if err != nil {
 		slog.Error("failed executing query", slog.Any("error", err))
 		return
@@ -60,7 +72,30 @@ func updateData() {
 			slog.Error("failed parsing line", slog.Any("error", err))
 			return
 		}
-		users.Set(float64(count))
+		users.WithLabelValues("ok").Set(float64(count))
+	}
+	rows, err = db.Query(
+		`	select count(distinct user_id)
+			from tokenowner 
+			join token on token.id = tokenowner.token_id 
+			where token.rollout_state IN ('verify', 'clientwait') and user_id in (
+			select user_id from tokenowner 
+			join token on token.id = tokenowner.token_id 
+			where token.rollout_state NOT IN ('verify', 'clientwait'));`,
+	)
+	if err != nil {
+		slog.Error("failed executing query", slog.Any("error", err))
+		return
+	}
+	//nolint:errcheck
+	defer rows.Close()
+	for rows.Next() {
+		var count int
+		if err := rows.Scan(&count); err != nil {
+			slog.Error("failed parsing line", slog.Any("error", err))
+			return
+		}
+		users.WithLabelValues("incomplete").Set(float64(count))
 	}
 }
 
@@ -69,7 +104,7 @@ var runCmd = &cobra.Command{
 	Use: "run",
 	Run: func(cmd *cobra.Command, args []string) {
 		usage = prometheus.NewGaugeVec(prometheus.GaugeOpts{Namespace: "edumfa", Subsystem: "token", Name: "count"}, []string{"model"})
-		users = prometheus.NewGauge(prometheus.GaugeOpts{Namespace: "edumfa", Subsystem: "user", Name: "count"})
+		users = prometheus.NewGaugeVec(prometheus.GaugeOpts{Namespace: "edumfa", Subsystem: "user", Name: "count"}, []string{"state"})
 		prometheus.MustRegister(usage)
 		prometheus.MustRegister(users)
 		s, err := gocron.NewScheduler()
