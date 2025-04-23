@@ -51,7 +51,7 @@ func updateData() {
 		}
 		usage.WithLabelValues(tokentype).Set(float64(count))
 	}
-	rows, err = db.Query(
+	rowsOk, err := db.Query(
 		`	select count(distinct user_id)
 			from tokenowner 
 			join token on token.id = tokenowner.token_id 
@@ -65,20 +65,20 @@ func updateData() {
 		return
 	}
 	//nolint:errcheck
-	defer rows.Close()
-	for rows.Next() {
+	defer rowsOk.Close()
+	for rowsOk.Next() {
 		var count int
-		if err := rows.Scan(&count); err != nil {
+		if err := rowsOk.Scan(&count); err != nil {
 			slog.Error("failed parsing line", slog.Any("error", err))
 			return
 		}
 		users.WithLabelValues("ok").Set(float64(count))
 	}
-	rows, err = db.Query(
+	rowsIncomplete, err := db.Query(
 		`	select count(distinct user_id)
 			from tokenowner 
 			join token on token.id = tokenowner.token_id 
-			where token.rollout_state IN ('verify', 'clientwait') and user_id in (
+			where token.rollout_state IN ('verify', 'clientwait') and user_id not in (
 			select user_id from tokenowner 
 			join token on token.id = tokenowner.token_id 
 			where token.rollout_state NOT IN ('verify', 'clientwait'));`,
@@ -88,10 +88,10 @@ func updateData() {
 		return
 	}
 	//nolint:errcheck
-	defer rows.Close()
-	for rows.Next() {
+	defer rowsIncomplete.Close()
+	for rowsIncomplete.Next() {
 		var count int
-		if err := rows.Scan(&count); err != nil {
+		if err := rowsIncomplete.Scan(&count); err != nil {
 			slog.Error("failed parsing line", slog.Any("error", err))
 			return
 		}
