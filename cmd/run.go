@@ -55,7 +55,7 @@ func updateData() {
 		`	select count(distinct user_id)
 			from tokenowner 
 			join token on token.id = tokenowner.token_id 
-			where token.rollout_state NOT IN ('verify', 'clientwait') and user_id in (
+			where token.rollout_state NOT IN ('verify', 'clientwait') and user_id not in (
 			select user_id from tokenowner 
 			join token on token.id = tokenowner.token_id 
 			where token.rollout_state IN ('verify', 'clientwait'));`,
@@ -73,6 +73,29 @@ func updateData() {
 			return
 		}
 		users.WithLabelValues("ok").Set(float64(count))
+	}
+	rowsMixed, err := db.Query(
+		`	select count(distinct user_id)
+			from tokenowner 
+			join token on token.id = tokenowner.token_id 
+			where token.rollout_state NOT IN ('verify', 'clientwait') and user_id in (
+			select user_id from tokenowner 
+			join token on token.id = tokenowner.token_id 
+			where token.rollout_state IN ('verify', 'clientwait'));`,
+	)
+	if err != nil {
+		slog.Error("failed executing query", slog.Any("error", err))
+		return
+	}
+	//nolint:errcheck
+	defer rowsMixed.Close()
+	for rowsMixed.Next() {
+		var count int
+		if err := rowsMixed.Scan(&count); err != nil {
+			slog.Error("failed parsing line", slog.Any("error", err))
+			return
+		}
+		users.WithLabelValues("mixed").Set(float64(count))
 	}
 	rowsIncomplete, err := db.Query(
 		`	select count(distinct user_id)
