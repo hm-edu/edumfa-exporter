@@ -147,6 +147,7 @@ var runCmd = &cobra.Command{
 		tokens = prometheus.NewGaugeVec(prometheus.GaugeOpts{Namespace: "edumfa", Subsystem: "token", Name: "tokens_per_user"}, []string{"token_count"})
 		prometheus.MustRegister(usage)
 		prometheus.MustRegister(users)
+		prometheus.MustRegister(tokens)
 		s, err := gocron.NewScheduler()
 		if err != nil {
 			panic(err)
