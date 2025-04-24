@@ -144,7 +144,7 @@ var runCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		usage = prometheus.NewGaugeVec(prometheus.GaugeOpts{Namespace: "edumfa", Subsystem: "token", Name: "count"}, []string{"model"})
 		users = prometheus.NewGaugeVec(prometheus.GaugeOpts{Namespace: "edumfa", Subsystem: "user", Name: "count"}, []string{"state"})
-		tokens = prometheus.NewGaugeVec(prometheus.GaugeOpts{Namespace: "edumfa", Subsystem: "token", Name: "count"}, []string{"token_count"})
+		tokens = prometheus.NewGaugeVec(prometheus.GaugeOpts{Namespace: "edumfa", Subsystem: "token", Name: "tokens_per_user"}, []string{"token_count"})
 		prometheus.MustRegister(usage)
 		prometheus.MustRegister(users)
 		s, err := gocron.NewScheduler()
