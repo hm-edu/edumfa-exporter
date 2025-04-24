@@ -20,6 +20,7 @@ import (
 var db string
 var usage *prometheus.GaugeVec
 var users *prometheus.GaugeVec
+var tokens *prometheus.GaugeVec
 
 func updateData() {
 	db, err := sql.Open("mysql", db)
@@ -120,6 +121,21 @@ func updateData() {
 		}
 		users.WithLabelValues("incomplete").Set(float64(count))
 	}
+	rowsTokenPerUser, err := db.Query("select count(*) as `users`, number_of_tokens from (select count(token_id) as number_of_tokens, user_id from tokenowner join token on token.id = tokenowner.token_id where token.rollout_state NOT IN ('clientwait', 'verify') OR rollout_state IS NULL group by user_id) as `usage` group by number_of_tokens;")
+	if err != nil {
+		slog.Error("failed executing query", slog.Any("error", err))
+		return
+	}
+	//nolint:errcheck
+	defer rowsTokenPerUser.Close()
+	for rowsTokenPerUser.Next() {
+		var count, numberOfTokens int
+		if err := rowsTokenPerUser.Scan(&count, &numberOfTokens); err != nil {
+			slog.Error("failed parsing line", slog.Any("error", err))
+			return
+		}
+		tokens.WithLabelValues(fmt.Sprintf("%d", numberOfTokens)).Set(float64(count))
+	}
 }
 
 // runCmd represents the run command
@@ -128,6 +144,7 @@ var runCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		usage = prometheus.NewGaugeVec(prometheus.GaugeOpts{Namespace: "edumfa", Subsystem: "token", Name: "count"}, []string{"model"})
 		users = prometheus.NewGaugeVec(prometheus.GaugeOpts{Namespace: "edumfa", Subsystem: "user", Name: "count"}, []string{"state"})
+		tokens = prometheus.NewGaugeVec(prometheus.GaugeOpts{Namespace: "edumfa", Subsystem: "token", Name: "count"}, []string{"token_count"})
 		prometheus.MustRegister(usage)
 		prometheus.MustRegister(users)
 		s, err := gocron.NewScheduler()
