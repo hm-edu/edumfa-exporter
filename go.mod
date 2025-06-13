@@ -4,7 +4,7 @@ go 1.24.1
 
 require (
 	github.com/go-co-op/gocron/v2 v2.16.2
-	github.com/go-sql-driver/mysql v1.9.2
+	github.com/go-sql-driver/mysql v1.9.3
 	github.com/prometheus/client_golang v1.22.0
 	github.com/spf13/cobra v1.9.1
 )
