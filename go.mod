@@ -3,7 +3,7 @@ module github.com/hm-edu/edumfa-exporter
 go 1.24.1
 
 require (
-	github.com/go-co-op/gocron/v2 v2.18.2
+	github.com/go-co-op/gocron/v2 v2.19.1
 	github.com/go-sql-driver/mysql v1.9.3
 	github.com/prometheus/client_golang v1.23.2
 	github.com/spf13/cobra v1.10.2
