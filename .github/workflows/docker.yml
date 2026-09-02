@@ -3,6 +3,8 @@ name: Docker
 on:
   push:
   pull_request:
+  # Dispatched on the new tag by the weekly release workflow
+  workflow_dispatch:
 
 jobs: 
   docker:
