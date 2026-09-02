@@ -1,0 +1,72 @@
+name: Weekly Release
+
+on:
+  schedule:
+    # Every Monday at 06:00 UTC
+    - cron: '0 6 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Determine next version
+        id: version
+        run: |
+          last_tag=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+          if [ -z "$last_tag" ]; then
+            echo "tag=v1.0.0" >> "$GITHUB_OUTPUT"
+            echo "release=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          commits=$(git rev-list "${last_tag}..HEAD" --count)
+          if [ "$commits" -eq 0 ]; then
+            echo "No new commits since ${last_tag}, skipping release."
+            echo "release=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          # Conventional commits decide the bump: breaking -> major, feat -> minor, else patch
+          subjects=$(git log "${last_tag}..HEAD" --pretty=%s)
+          bump=patch
+          if git log "${last_tag}..HEAD" --pretty=%B | grep -q 'BREAKING CHANGE' \
+             || echo "$subjects" | grep -Eq '^[a-z]+(\([^)]*\))?!:'; then
+            bump=major
+          elif echo "$subjects" | grep -Eq '^feat(\([^)]*\))?:'; then
+            bump=minor
+          fi
+
+          IFS=. read -r major minor patch <<< "${last_tag#v}"
+          case "$bump" in
+            major) major=$((major+1)); minor=0; patch=0 ;;
+            minor) minor=$((minor+1)); patch=0 ;;
+            patch) patch=$((patch+1)) ;;
+          esac
+          next="v${major}.${minor}.${patch}"
+
+          echo "Next release: ${next} (${bump} bump, ${commits} commits since ${last_tag})"
+          echo "tag=${next}" >> "$GITHUB_OUTPUT"
+          echo "release=true" >> "$GITHUB_OUTPUT"
+
+      - name: Create release
+        if: steps.version.outputs.release == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "${{ steps.version.outputs.tag }}" --target "${{ github.sha }}" --generate-notes
+
+      # Tags created with GITHUB_TOKEN do not trigger push workflows,
+      # so the Docker build must be dispatched explicitly.
+      - name: Trigger Docker build for the new tag
+        if: steps.version.outputs.release == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run docker.yml --ref "${{ steps.version.outputs.tag }}"
