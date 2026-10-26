@@ -3,7 +3,7 @@ module github.com/hm-edu/edumfa-exporter
 go 1.26.0
 
 require (
-	github.com/go-co-op/gocron/v2 v2.22.0
+	github.com/go-co-op/gocron/v2 v2.23.0
 	github.com/go-sql-driver/mysql v1.10.1
 	github.com/prometheus/client_golang v1.25.0
 	github.com/spf13/cobra v1.10.2
@@ -22,7 +22,6 @@ require (
 	github.com/prometheus/procfs v0.22.0 // indirect
 	github.com/robfig/cron/v3 v3.0.1 // indirect
 	github.com/spf13/pflag v1.0.9 // indirect
-	go.yaml.in/yaml/v2 v2.4.4 // indirect
 	golang.org/x/sys v0.48.0 // indirect
 	google.golang.org/protobuf v1.36.12 // indirect
 )
